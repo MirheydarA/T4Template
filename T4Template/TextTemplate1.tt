@@ -67,7 +67,7 @@ SELECT @classDefinition;";
             {
                 while (reader.Read())
                 {
-                    tableNames.Add(reader[0].ToString()); /*tablo isimlerini listeye ekliyor*/
+                    tableNames.Add(reader[0].ToString()); 
                 }
             }
         }
@@ -88,8 +88,9 @@ SELECT @classDefinition;";
 
     string GetTableData(string tableName)
     {
-        using (SqlConnection con = new SqlConnection(connectionString))
-        {
+
+    using (SqlConnection con = new SqlConnection(connectionString))
+    {
             con.Open();
             using (SqlCommand cmd = new SqlCommand(query, con))
             {
@@ -101,11 +102,13 @@ SELECT @classDefinition;";
                         string properties = reader["properties"].ToString();
                         return $"public class {tableName.Replace(" ", "")}\n{{\n{properties}}}";
                     }
-                    else
+                   
+                   else
                     {
                         return default;
                     }
-                }
+               
+               }
             }
         }
     }
