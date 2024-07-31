@@ -1,0 +1,112 @@
+﻿<#@ template language="C#" debug="false" hostspecific="true" #>
+<#@ output extension=".cs" #>
+<#@ assembly name="System.Data" #>
+<#@ import namespace="System" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ import namespace="System.Data" #>
+<#@ import namespace="System.Data.SqlClient" #>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System.Text" #>
+
+<#
+
+    string connection = "Server=DESKTOP-00LV7K0\\SQLEXPRESS01;Database=PhoneBook;Trusted_Connection=True;";
+
+    string GetTableData(string tableName)
+            {
+                string query = $@"DECLARE @table NVARCHAR(250) = '{tableName}';
+
+            DECLARE @classHeader NVARCHAR(MAX) = 'public class ' + @table + '
+{{
+';
+
+
+
+    DECLARE @properties NVARCHAR(MAX) = (
+SELECT STRING_AGG(CONCAT(
+'    public ',
+IIF(DATA_TYPE = 'nvarchar', 'string' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'uniqueidentifier', 'string' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'ntext', 'string' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'nchar', 'string' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'int', 'int' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'smallint', 'short' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'tinyint', 'byte' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'money', 'decimal' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'float', 'float' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'decimal', 'decimal' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'bit', 'bool' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'datetime', 'DateTime' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'date', 'DateTime' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'datetime2', 'DateTime' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'image', 'byte[]' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+IIF(DATA_TYPE = 'real', 'float' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
+' ',
+COLUMN_NAME,
+' {{ get; set; }}',
+IIF((DATA_TYPE = 'nvarchar' OR DATA_TYPE = 'nchar') AND IS_NULLABLE = 'NO', ' = null!;', ''),
+CHAR(13), CHAR(10)
+), '') AS properties
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = @table
+AND TABLE_SCHEMA = 'dbo'
+);
+
+// Combine header, properties and footer
+DECLARE @classDefinition NVARCHAR(MAX) = @classHeader + @properties + @classFooter;
+
+SELECT @classDefinition;";
+
+    var tableNames = new List<string>();
+    using (SqlConnection con = new SqlConnection(connectionString))
+    {
+        con.Open();
+        using (SqlCommand cmd = new SqlCommand("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='Northwind'", con))
+        {
+            using (SqlDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    tableNames.Add(reader[0].ToString()); /*tablo isimlerini listeye ekliyor*/
+                }
+            }
+        }
+    }
+
+    string filePath = Path.Combine(Host.ResolvePath("."), "Models");
+    if (!Directory.Exists(filePath))
+    {
+        Directory.CreateDirectory(filePath);
+    }
+
+    foreach (string tableName in tableNames)
+    {
+        string classPath = Path.Combine(filePath, tableName.Replace(" ", "") + ".cs");
+        string content = GetTableData(tableName);
+        File.WriteAllText(classPath, content, Encoding.UTF8); 
+    }
+
+    string GetTableData(string tableName)
+    {
+        using (SqlConnection con = new SqlConnection(connectionString))
+        {
+            con.Open();
+            using (SqlCommand cmd = new SqlCommand(query, con))
+            {
+                cmd.Parameters.AddWithValue("@TableName", tableName);
+                using (SqlDataReader reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        string properties = reader["properties"].ToString();
+                        return $"public class {tableName.Replace(" ", "")}\n{{\n{properties}}}";
+                    }
+                    else
+                    {
+                        return default;
+                    }
+                }
+            }
+        }
+    }
+#>
