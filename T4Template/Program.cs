@@ -1,10 +1,10 @@
-﻿//namespace T4Template
-//{
-//    internal class Program
-//    {
-//        static void Main(string[] args)
-//        {
-//            Console.WriteLine("Hello, World!");
-//        }
-//    }
-//}
+﻿namespace T4Template
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Console.WriteLine("Hello, World!");
+        }
+    }
+}

@@ -1,115 +1,106 @@
-﻿<#@ template language="C#" debug="false" hostspecific="true" #>
-<#@ output extension=".cs" #>
+﻿<#@ template language="C#" hostspecific="true" debug="true" #>
+<#@ output extension=".txt" #>
 <#@ assembly name="System.Data" #>
 <#@ import namespace="System" #>
-<#@ import namespace="System.Collections.Generic" #>
-<#@ import namespace="System.Data" #>
 <#@ import namespace="System.Data.SqlClient" #>
 <#@ import namespace="System.IO" #>
 <#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
 
 <#
 
-    string connection = "Server=DESKTOP-00LV7K0\\SQLEXPRESS01;Database=PhoneBook;Trusted_Connection=True;";
 
-    string GetTableData(string tableName)
-            {
-                string query = $@"DECLARE @table NVARCHAR(250) = '{tableName}';
+string connectionString = "Server=DESKTOP-00LV7K0\\SQLEXPRESS01;Database=Northwind;Trusted_Connection=True;TrustServerCertificate=True";
 
-            DECLARE @classHeader NVARCHAR(MAX) = 'public class ' + @table + '
-{{
-';
-
-
-
-    DECLARE @properties NVARCHAR(MAX) = (
-SELECT STRING_AGG(CONCAT(
-'    public ',
-IIF(DATA_TYPE = 'nvarchar', 'string' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'uniqueidentifier', 'string' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'ntext', 'string' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'nchar', 'string' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'int', 'int' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'smallint', 'short' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'tinyint', 'byte' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'money', 'decimal' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'float', 'float' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'decimal', 'decimal' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'bit', 'bool' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'datetime', 'DateTime' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'date', 'DateTime' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'datetime2', 'DateTime' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'image', 'byte[]' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-IIF(DATA_TYPE = 'real', 'float' + IIF(IS_NULLABLE = 'YES', '?', ''), ''),
-' ',
-COLUMN_NAME,
-' {{ get; set; }}',
-IIF((DATA_TYPE = 'nvarchar' OR DATA_TYPE = 'nchar') AND IS_NULLABLE = 'NO', ' = null!;', ''),
-CHAR(13), CHAR(10)
-), '') AS properties
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = @table
-AND TABLE_SCHEMA = 'dbo'
-);
-
-// Combine header, properties and footer
-DECLARE @classDefinition NVARCHAR(MAX) = @classHeader + @properties + @classFooter;
-
-SELECT @classDefinition;";
-
-    var tableNames = new List<string>();
-    using (SqlConnection con = new SqlConnection(connectionString))
+    List<string> tableNames = new List<string>();
+    using (SqlConnection connection = new SqlConnection(connectionString))
     {
-        con.Open();
-        using (SqlCommand cmd = new SqlCommand("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='Northwind'", con))
+        connection.Open();
+        using (SqlCommand command = new SqlCommand("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='Northwind'", connection))
         {
-            using (SqlDataReader reader = cmd.ExecuteReader())
+            using (SqlDataReader reader = command.ExecuteReader())
             {
                 while (reader.Read())
                 {
-                    tableNames.Add(reader[0].ToString()); 
+                    tableNames.Add(reader.GetString(0));
                 }
             }
         }
     }
 
-    string filePath = Path.Combine(Host.ResolvePath("."), "Models");
-    if (!Directory.Exists(filePath))
+    string modelFolderPath = Path.Combine(Host.ResolvePath("."), "Models");
+    if (!Directory.Exists(modelFolderPath))
     {
-        Directory.CreateDirectory(filePath);
+        Directory.CreateDirectory(modelFolderPath);
     }
 
     foreach (string tableName in tableNames)
     {
-        string classPath = Path.Combine(filePath, tableName.Replace(" ", "") + ".cs");
-        string content = GetTableData(tableName);
-        File.WriteAllText(classPath, content, Encoding.UTF8); 
+        string classContent = GenerateClassForTable(tableName);
+        string classFilePath = Path.Combine(modelFolderPath, tableName + ".cs");
+
+        File.WriteAllText(classFilePath, classContent);
     }
 
-    string GetTableData(string tableName)
+    string GenerateClassForTable(string tableName)
     {
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine("namespace Models");
+        sb.AppendLine("{");
+        sb.AppendLine($"    public class {tableName}");
+        sb.AppendLine("    {");
 
-    using (SqlConnection con = new SqlConnection(connectionString))
-    {
-            con.Open();
-            using (SqlCommand cmd = new SqlCommand(query, con))
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            connection.Open();
+            using (SqlCommand command = new SqlCommand($"SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tableName}' AND TABLE_CATALOG='Northwind'", connection))
             {
-                cmd.Parameters.AddWithValue("@TableName", tableName);
-                using (SqlDataReader reader = cmd.ExecuteReader())
+                using (SqlDataReader reader = command.ExecuteReader())
                 {
-                    if (reader.Read())
+                    while (reader.Read())
                     {
-                        string properties = reader["properties"].ToString();
-                        return $"public class {tableName.Replace(" ", "")}\n{{\n{properties}}}";
+                        string columnName = reader.GetString(0);
+                        string dataType = reader.GetString(1);
+                        bool isNullable = reader.GetString(2) == "YES";
+
+                        string csharpType = MapSqlTypeToCSharp(dataType, isNullable);
+
+                        sb.AppendLine($"        public {csharpType} {columnName} {{ get; set; }}");
                     }
-                   
-                   else
-                    {
-                        return default;
-                    }
-               
-               }
+                }
             }
         }
+
+sb.AppendLine("    }");
+sb.AppendLine("}");
+
+        return sb.ToString();
+    }
+
+    string MapSqlTypeToCSharp(string sqlType, bool isNullable)
+    {
+        string csharpType = sqlType switch
+        {
+            "int" => "int",
+            "bigint" => "long",
+            "smallint" => "short",
+            "decimal" => "decimal",
+            "numeric" => "decimal",
+            "datetime" => "DateTime",
+            "date" => "DateTime",
+            "char" => "string",
+            "varchar" => "string",
+            "text" => "string",
+            "nchar" => "string",
+            "nvarchar" => "string",
+            _ => "object",
+        };
+
+        if (isNullable && csharpType != "string" && csharpType != "byte[]")
+        {
+            csharpType += "?";
+        }
+
+        return csharpType;
     }
 #>
