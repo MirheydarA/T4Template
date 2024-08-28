@@ -13,6 +13,6 @@ namespace Models
         public string Country { get; set; }
         public string Phone { get; set; }
         public string Fax { get; set; }
-        public object? HomePage { get; set; }
+        public object HomePage { get; set; }
     }
 }

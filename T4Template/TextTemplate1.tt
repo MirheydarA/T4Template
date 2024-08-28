@@ -96,11 +96,6 @@ sb.AppendLine("}");
             _ => "object",
         };
 
-        if (isNullable && csharpType != "string" && csharpType != "byte[]")
-        {
-            csharpType += "?";
-        }
-
         return csharpType;
     }
 #>
